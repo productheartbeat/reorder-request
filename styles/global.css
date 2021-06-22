@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #__next{
+    @apply h-full;
+}
+
+body {
+    /*background-color: rgba(31, 41, 55, 1);*/
+    @apply bg-gray-200;
+}

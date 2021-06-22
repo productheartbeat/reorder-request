@@ -1,0 +1,38 @@
+const orderQuery = `
+  query ORDER_QUERY($idFromPlatform_like: String = "0") {
+    StoreOrder(where: {idFromPlatform: {_like: $idFromPlatform_like}}) {
+      idFromPlatform
+      storeOrderId
+      createdOn
+      orderTotal
+      Customer {
+        firstName
+      }
+      Store {
+        name
+      }
+      ShippingAddress {
+        postalCode
+      }
+      StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
+        name
+        sku
+        price
+        variantId
+        quantity
+      }
+      ShippingProtectionClaims_aggregate {
+        aggregate {
+          count
+        }
+      }
+    }
+    storeOrderLineItem_aggregate(where: {storeOrder: {idFromPlatform: {_like: $idFromPlatform_like}}}) {
+      aggregate {
+        count
+      }
+    }
+  }
+`
+
+export default orderQuery;
