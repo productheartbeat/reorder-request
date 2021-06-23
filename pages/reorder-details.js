@@ -49,10 +49,10 @@ const ReorderDetails = (props) => {
       <Layout>
         <ReorderDetailsLost />
         <div className="mt-8">
-          <FormTextarea label="Any other comments?" id="claimComments" name="claim_comment" />
+          <FormTextarea label="Any other comments?" id="claimComments" name="claim_comment" value={claimMessage} onChange={onClaimMessageChange} />
         </div>
         <div className="mt-12">
-          <Button label="Next" path="/review" onClick={() => setClaimConclusionStep(2)}>
+          <Button label="Next" path="/review" onClick={handleDamageSubmit}>
             <SvgIcon role="arrow-right" />
           </Button>
         </div>

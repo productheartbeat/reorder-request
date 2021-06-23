@@ -27,6 +27,8 @@ const Layout = (props) => {
 		}
 	}
 
+  
+
 	return (
 		<div className="min-h-full h-full relative" key={0}>
 			<div className="content-wrapper min-h-full relative">
@@ -46,7 +48,7 @@ const Layout = (props) => {
 								: 
 									"" 
 								}
-								{page != "help"
+								{Router.pathname != "/help"
 								?
 									<span className="absolute top-3 right-3 cursor-pointer" onClick={goToHelp}>
 										<SvgIcon role="question" />

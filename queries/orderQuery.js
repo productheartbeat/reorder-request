@@ -5,6 +5,7 @@ const orderQuery = `
       storeOrderId
       createdOn
       orderTotal
+      customerEmail
       Customer {
         firstName
       }

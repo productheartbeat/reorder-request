@@ -6,7 +6,6 @@ import ListItem from "../components/listItem"
 import Button from "../components/button"
 import SvgIcon from "../components/icons"
 import useSWR from 'swr';
-import Link from 'next/Link';
 import { useContext } from 'react';
 import OrderContext from '../components/OrderContext';
 

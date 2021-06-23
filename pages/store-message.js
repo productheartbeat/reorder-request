@@ -39,7 +39,7 @@ export default function StoreMessage() {
       </Layout>
     )
 
-  } else if ( data.StoreOrder[0].ShippingProtectionClaims_aggregate.aggregate.count > 5 ) {
+  } else if ( data.StoreOrder[0].ShippingProtectionClaims_aggregate.aggregate.count > 0 ) {
 
     return (
       <Layout>
