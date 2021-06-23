@@ -71,7 +71,7 @@ const Confirmation = (props) => {
               <div>
                 <div className="space-y-4 text-sm">
                   <p>Here's what happens next. I just sent you an email to {claim.OriginalStoreOrder.customerEmail} with this confirmation.</p>
-                  <p>We have a quick turnaround, so you should from me within 24 hours. We know shipping issues are frustrating, so I'm on this. I'll be in touch.</p>
+                  <p>We have a quick turnaround on requests, so you should from me within 24 hours. We know shipping issues are frustrating, so I'm on this. I'll be in touch.</p>
                   <div className="flex items-center flex-row pt-4">
                     <div className="mr-4" style={{width: "80px"}}>
                       <img className="rounded-full" src={serviceProfileUrl} />

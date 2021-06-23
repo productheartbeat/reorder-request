@@ -27,8 +27,6 @@ const Layout = (props) => {
 		}
 	}
 
-  
-
 	return (
 		<div className="min-h-full h-full relative" key={0}>
 			<div className="content-wrapper min-h-full relative">
@@ -37,7 +35,7 @@ const Layout = (props) => {
 					<div className="card-wrapper md:py-0 relative sm:max-w-2xl sm:mx-auto w-full">
 						<div className="card relative bg-white shadow-lg rounded-xl sm:rounded-3xl w-full border-b-8 border-green-600">
 							<div className="card-body px-4 py-10 sm:p-20">
-								{orderNumber && Router.pathname != "/"
+								{orderNumber && page != "/"
 								?
 									<span onClick={backLogic} className="absolute top-3 left-3 cursor-pointer font-bold text-green-700">
 										<div className="flex items-center">
@@ -48,7 +46,7 @@ const Layout = (props) => {
 								: 
 									"" 
 								}
-								{Router.pathname != "/help"
+								{page != "/help"
 								?
 									<span className="absolute top-3 right-3 cursor-pointer" onClick={goToHelp}>
 										<SvgIcon role="question" />
