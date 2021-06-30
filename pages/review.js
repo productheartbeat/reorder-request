@@ -5,6 +5,8 @@ import Router from 'next/router';
 import { withRouter } from 'next/router'
 import List from "../components/list"
 import ListItem from "../components/listItem"
+import Dl from "../components/dl"
+import DlItem from "../components/dlItem"
 import useSWR from 'swr';
 import { gql } from 'graphql-request'
 import { CorsoGraphQLClient } from '../queries/graphqlClient';
@@ -18,6 +20,14 @@ const GET_SELECTED_PRODUCTS_QUERY = gql`
       quantity
       sku
       storeOrderLineItem: storeOrderLineItemId
+    }
+    StoreOrderLineItem_aggregate(where: {storeOrderLineItemId: {_in: $storeOrderLineItemId_in}, storeOrder: {idFromPlatform: {_eq: $idFromPlatform_eq}}}) {
+      aggregate {
+        count
+        sum {
+          price
+        }
+      }
     }
   }
 `
@@ -92,7 +102,7 @@ const Review = (props) => {
 
   const { data: thisOrderClaimsCountDataSwr, error: thisOrderClaimsCountErrorSwr } = useSWR(THIS_ORDER_CLAIMS_COUNT_QUERY, ThisOrderClaimsCountFetcher); 
   
-
+  
   /* GET THE PRODUCTS ASSOCIATED TO THE STORE LINE ITEM IDS FOR THIS ORDER */
 
   const selectedReorderProductsFetcher = async () => {
@@ -148,11 +158,13 @@ const Review = (props) => {
   
   const { StoreOrder } = orderDataSwr
 
-  const SelectedProductsToReorder = [selectedReorderProductsDataSwr.SelectedProduct[0]];
-
   const ThisOrderClaims = [thisOrderClaimsCountDataSwr.Claim[0].ShippingProtectionClaims[0]];
 
-  localStorage.setItem("selected_products", JSON.stringify(SelectedProductsToReorder));
+  localStorage.setItem("selected_products", JSON.stringify(selectedReorderProductsDataSwr.SelectedProduct));
+
+  const lsSelectedProducts = JSON.parse(localStorage.getItem("selected_products"));
+
+  const lsSelectedProductsReduced = lsSelectedProducts.map(({name, price, sku, ...keepAttrs}) => keepAttrs)
 
   const goToOptions=()=>{
     Router.push({
@@ -178,30 +190,44 @@ const Review = (props) => {
 
     return (
       <div>
-        <StepHeading number="5" title="Reorder Request Review" subtitle="Meet your Corso concierge" />
+        <StepHeading number="5" title="Reorder Request Review" subtitle="Please review your reorder request before submitting" />
         {
           StoreOrder.map((order, index) => (
             <div key={index}>
+              <Dl>
+                <DlItem 
+                  label="Customer Name" 
+                  desc={order.Customer.firstName + " " + order.Customer.lastName} 
+                />
+                <DlItem 
+                  label="Store" 
+                  desc={order.Store.name} 
+                />
+                <DlItem 
+                  label="Original Order Number" 
+                  desc={order.idFromPlatform} 
+                />
+                <DlItem 
+                  label="Original Order Date" 
+                  desc={
+                    new Date(order.createdOn).getMonth() + 1 
+                    + "/" +
+                    new Date(order.createdOn).getDate() 
+                    + "/" +
+                    new Date(order.createdOn).getFullYear()
+                  } 
+                />
+                <DlItem 
+                  label="Shipping Postal Code" 
+                  desc={order.ShippingAddress.postalCode} 
+                />
+              </Dl>
               <div className="flex items-center flex-col">
-                <div className="mb-4" style={{width: "80px"}}>
-                  <img className="rounded-full" src={serviceProfileUrl} />
-                </div>
                 <div className="w-full space-y-4 text-sm">
-                  <p>Hi, I'm {serviceName}. Thanks for getting this started. I'll be helping you from here on out, and I want to make sure we got this right.</p>
-                  <p>Looks like you placed an order on {new Date(order.createdOn).getMonth() + 1 + "/" + new Date(order.createdOn).getDate() + "/" + new Date(order.createdOn).getFullYear()}, but your package for order #{lsOrderNumber} was {lsClaimReason}.</p>
-                  {lsClaimMessage != ""
-                  ?
-                    <div>
-                      <p>I also got this message from you: <span className="italic">"{lsClaimMessage}"</span></p>
-                    </div>
-                  :
-                    ""
-                  }
                   <div>
-                    <p>I will be {lsType == "reorder" ? "reordering" : "refunding" } the following products:</p>
                     <List>
                       {
-                        SelectedProductsToReorder.map((selectedProduct, index) => (
+                        selectedReorderProductsDataSwr.SelectedProduct.map((selectedProduct, index) => (
                           <div key={"product_"+index}>
                             <ListItem 
                               title={selectedProduct.name} 
@@ -219,8 +245,6 @@ const Review = (props) => {
                       }
                     </List>
                   </div>
-                  
-                  <p>Please confirm that you would you like me to {lsType == "reorder" ? "reorder your products to the same shipping address at zip code " + order.ShippingAddress.postalCode + "?" : "refund the amount you paid for the shipped products?"}</p>
                 </div>
               </div>
               <div className="mt-16 space-y-6 self-start">

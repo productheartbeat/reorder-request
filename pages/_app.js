@@ -19,6 +19,7 @@ const ORDER_QUERY = gql`
       cancelReason
       Customer {
         firstName
+        lastName
         customerId
       }
       Store {
