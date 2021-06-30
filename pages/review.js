@@ -1,42 +1,158 @@
 import React, {useState, useContext} from "react";
-import Layout from "../components/layout"
 import StepHeading from "../components/stepHeading"
 import Button from "../components/button"
 import Router from 'next/router';
 import { withRouter } from 'next/router'
+import List from "../components/list"
+import ListItem from "../components/listItem"
 import useSWR from 'swr';
+import { gql } from 'graphql-request'
+import { CorsoGraphQLClient } from '../queries/graphqlClient';
 import OrderContext from '../components/OrderContext';
+
+const GET_SELECTED_PRODUCTS_QUERY = gql`
+  query GET_VARIANT_DATA($storeOrderLineItemId_in: [Int!], $idFromPlatform_eq: String = "") {
+    SelectedProduct: StoreOrderLineItem(where: {storeOrderLineItemId: {_in: $storeOrderLineItemId_in}, storeOrder: {idFromPlatform: {_eq: $idFromPlatform_eq}}}) {
+      name
+      price
+      quantity
+      sku
+      storeOrderLineItem: storeOrderLineItemId
+    }
+  }
+`
+
+const INSERT_CLAIM_QUERY = gql`
+  mutation MyMutation(
+    $noteFromCustomer: String!, 
+    $claimReason: String!, 
+    $shipProtectClaimLineItem_insert_input: [ShippingProtectionClaimLineItem_insert_input!] = {quantity: 10, storeOrderLineItem: 10}, $originalStoreOrderId: Int!) {
+      insertClaim: insert_ShippingProtectionClaim_one(
+        object: {claimReason: $claimReason, noteFromCustomer: $noteFromCustomer, OriginalStoreOrderLineItems: {data: $shipProtectClaimLineItem_insert_input}, originalStoreOrderId: $originalStoreOrderId}
+      ) {
+        claimReason
+        noteFromCustomer
+        reorderStoreOrderId
+        statusChangedOn
+        shippingProtectionClaimId
+        OriginalStoreOrder {
+          Customer {
+            email
+          }
+          Store {
+            url
+            name
+          }
+        }
+      }
+   }
+`
+
+const THIS_ORDER_CLAIMS_COUNT_QUERY = gql`
+  query MyQuery($idFromPlatform_eq: String = "") {
+    Claim: StoreOrder(where: {idFromPlatform: {_eq: $idFromPlatform_eq}}) {
+      ShippingProtectionClaims_aggregate {
+        aggregate {
+          count
+        }
+      }
+      ShippingProtectionClaims {
+        shippingProtectionClaimId
+      }
+    }
+  }
+`
 
 const Review = (props) => {
 
-  const serviceProfileUrl = "https://images.unsplash.com/profile-1489175036767-c3b81d0e32d7?dpr=1&auto=format&fit=crop&w=150&h=150&q=60&crop=faces&bg=fff";
+  const [ claimsData, setClaimsData] = useState('');
+  const [ selectedProductsData, setSelectedProductsData] = useState('');
+
+  const { fetchedOrderData, startOver, orderQuery } = useContext(OrderContext);
+  const { data: orderDataSwr, error: orderErrorSwr } = useSWR(orderQuery, fetchedOrderData)
+
   
-  const serviceName = "Melissa";
+  
+  
+  /* FIND OUT IF THERE IS ALREADY A CLAIM ON THIS ORDER BEFORE ALLOWING USER TO SUBMIT ANOTHER CLAIM */
 
-  const { orderInfo } = useContext(OrderContext);
-  const { data, error } = useSWR(orderInfo, orderInfo)
-  if (error) return <div>Failed to load</div>
-  if (!data) return <div>Loading...</div>
-  const { StoreOrder } = data  
+  const ThisOrderClaimsCountFetcher = async () => {
 
-  const lsReason = localStorage.getItem("claim_reason");
-  const lsType = localStorage.getItem("claim_type");
-  const lsOrderNumber = localStorage.getItem("order_number");
-  const lsClaimMessage = localStorage.getItem("claim_message");
-  const lsStoreOrderId = localStorage.getItem("store_order_id"); 
+    // Get data from local storage
+    const orderNumber = localStorage.getItem("order_number");
 
-  const lsReorderSkusJson = JSON.parse(localStorage.getItem("reorder_ids"))
 
-  console.log("==========================")
-  console.log("Data to be sent to Corso DB")
-  console.log("==========================")
-  console.log("Claim Reason: ", lsReason)
-  console.log("Claim Type: ", lsType)
-  console.log("OrderNumber: ", lsOrderNumber)
-  console.log("Claim Message: ", lsClaimMessage)
-  console.log("Claim Skus: ", lsReorderSkusJson)
-  console.log("Store Order ID: ", lsStoreOrderId)
-  console.log("==========================")
+    const THIS_ORDER_CLAIMS_COUNT_VARIABLES = {
+      "idFromPlatform_eq": orderNumber
+    }
+
+    return CorsoGraphQLClient.request(THIS_ORDER_CLAIMS_COUNT_QUERY, THIS_ORDER_CLAIMS_COUNT_VARIABLES)
+
+  }
+
+  const { data: thisOrderClaimsCountDataSwr, error: thisOrderClaimsCountErrorSwr } = useSWR(THIS_ORDER_CLAIMS_COUNT_QUERY, ThisOrderClaimsCountFetcher); 
+  
+
+  /* GET THE PRODUCTS ASSOCIATED TO THE STORE LINE ITEM IDS FOR THIS ORDER */
+
+  const selectedReorderProductsFetcher = async () => {
+
+    // Get data from local storage
+    const selectedReorderIds = JSON.parse(localStorage.getItem("reorder_ids"));
+    const orderNumber = localStorage.getItem("order_number");
+
+    const GET_SELECTED_PRODUCTS_VARIABLES = {
+      "storeOrderLineItemId_in": selectedReorderIds,
+      "idFromPlatform_eq": orderNumber
+    }
+
+    return CorsoGraphQLClient.request(GET_SELECTED_PRODUCTS_QUERY, GET_SELECTED_PRODUCTS_VARIABLES)
+
+  }
+
+  const { data: selectedReorderProductsDataSwr, error: selectedReorderProductsErrorSwr } = useSWR(GET_SELECTED_PRODUCTS_QUERY, selectedReorderProductsFetcher)
+
+  
+  /* INSERT THE NEW CLAIM */
+
+  const insertClaimFetcher = async () => {
+
+    const lsStoreOrderId = localStorage.getItem("store_order_id");
+    const lsClaimMessage = localStorage.getItem("claim_message");
+    const lsClaimReason = localStorage.getItem("claim_reason");
+
+    const lsSelectedProducts = JSON.parse(localStorage.getItem("selected_products"));
+
+    const lsSelectedProductsReduced = lsSelectedProducts.map(({name, price, sku, ...keepAttrs}) => keepAttrs)
+
+    const INSERT_CLAIM_QUERY_VARIABLES = {
+      "noteFromCustomer": lsClaimMessage,
+      "claimReason": lsClaimReason,
+      "shipProtectClaimLineItem_insert_input": lsSelectedProductsReduced,
+      "originalStoreOrderId": lsStoreOrderId
+    }
+
+    const insertClaimData = await CorsoGraphQLClient.request(INSERT_CLAIM_QUERY, INSERT_CLAIM_QUERY_VARIABLES)
+    const claimId = insertClaimData.insertClaim.shippingProtectionClaimId;
+    
+    localStorage.setItem("claim_id", claimId);
+
+    Router.push({
+      pathname: '/confirmation',
+      query: {reason: props.router.query.reason, type: props.router.query.type, claimId: claimId}
+    });
+  }
+
+  if (orderErrorSwr || selectedReorderProductsErrorSwr || thisOrderClaimsCountErrorSwr ) return <div>Failed to load</div>
+  if (!orderDataSwr || !selectedReorderProductsDataSwr || !thisOrderClaimsCountDataSwr ) return <div>Loading...</div>
+  
+  const { StoreOrder } = orderDataSwr
+
+  const SelectedProductsToReorder = [selectedReorderProductsDataSwr.SelectedProduct[0]];
+
+  const ThisOrderClaims = [thisOrderClaimsCountDataSwr.Claim[0].ShippingProtectionClaims[0]];
+
+  localStorage.setItem("selected_products", JSON.stringify(SelectedProductsToReorder));
 
   const goToOptions=()=>{
     Router.push({
@@ -46,62 +162,90 @@ const Review = (props) => {
   }
 
   const goToConfirmation=()=>{
-    Router.push({
-      pathname: '/confirmation',
-      query: {reason: props.router.query.reason, type: props.router.query.type}
-    });
+    insertClaimFetcher();
   }
 
-  console.log("store orders: ", StoreOrder)
+  const lsClaimMessage = localStorage.getItem("claim_message");
+  const lsOrderNumber = localStorage.getItem("order_number");
+  const lsClaimReason = localStorage.getItem("claim_reason");
+  const lsType = localStorage.getItem("claim_type");
 
-  return (
-    <Layout>
-      <StepHeading number="5" title="Reorder Request Review" subtitle="Meet your Corso concierge" />
-      {
-        StoreOrder.map((order, index) => (
-          <div key={index}>
-            <div className="flex items-center flex-col">
-              <div className="mb-4" style={{width: "80px"}}>
-                <img className="rounded-full" src={serviceProfileUrl} />
-              </div>
-              <div className="w-full space-y-4 text-sm">
-                <p>Hi, I'm {serviceName}. Thanks for getting this started. I'll be helping you from here on out, and I want to make sure we got this right.</p>
-                <p>Looks like you placed an order on {new Date(order.createdOn).getMonth() + 1 + "/" + new Date(order.createdOn).getDate() + "/" + new Date(order.createdOn).getFullYear()}, but your package for order #{lsOrderNumber} was {lsReason}.</p>
-                {lsClaimMessage != ""
-                ?
-                  <div>
-                    <p>I also got this message from you:</p>
-                    <p className="italic ml-8 mt-4">"{lsClaimMessage}"</p>
-                  </div>
-                :
-                  ""
-                }
-                
-                <div>
-                  <p>I will be {lsType == "reorder" ? "reordering" : "refunding" } the following Product Variant Ids for you:</p>
-                  <ul className="list list-inside ml-8">
-                    {
-                      lsReorderSkusJson.map((sku, index) => (
-                        <li className="list-item list-disc" key={index}>
-                          {sku}
-                        </li>
-                      ))
-                    }
-                  </ul>
+  const serviceProfileUrl = "https://images.unsplash.com/profile-1489175036767-c3b81d0e32d7?dpr=1&auto=format&fit=crop&w=150&h=150&q=60&crop=faces&bg=fff";
+  
+  const serviceName = "Melissa";
+
+  if (thisOrderClaimsCountDataSwr.Claim[0].ShippingProtectionClaims_aggregate.aggregate.count < 1) {
+
+    return (
+      <div>
+        <StepHeading number="5" title="Reorder Request Review" subtitle="Meet your Corso concierge" />
+        {
+          StoreOrder.map((order, index) => (
+            <div key={index}>
+              <div className="flex items-center flex-col">
+                <div className="mb-4" style={{width: "80px"}}>
+                  <img className="rounded-full" src={serviceProfileUrl} />
                 </div>
-                
-                <p>Please confirm that you would you like me to {lsType == "reorder" ? "reorder your products to the same shipping address at zip code " + order.ShippingAddress.postalCode + "?" : "refund the amount you paid for the shipped products?"}</p>
+                <div className="w-full space-y-4 text-sm">
+                  <p>Hi, I'm {serviceName}. Thanks for getting this started. I'll be helping you from here on out, and I want to make sure we got this right.</p>
+                  <p>Looks like you placed an order on {new Date(order.createdOn).getMonth() + 1 + "/" + new Date(order.createdOn).getDate() + "/" + new Date(order.createdOn).getFullYear()}, but your package for order #{lsOrderNumber} was {lsClaimReason}.</p>
+                  {lsClaimMessage != ""
+                  ?
+                    <div>
+                      <p>I also got this message from you: <span className="italic">"{lsClaimMessage}"</span></p>
+                    </div>
+                  :
+                    ""
+                  }
+                  <div>
+                    <p>I will be {lsType == "reorder" ? "reordering" : "refunding" } the following products:</p>
+                    <List>
+                      {
+                        SelectedProductsToReorder.map((selectedProduct, index) => (
+                          <div key={"product_"+index}>
+                            <ListItem 
+                              title={selectedProduct.name} 
+                              subtitle={selectedProduct.sku}
+                              desc={"Qty. "+selectedProduct.quantity}
+                              end={
+                                new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: 'USD',
+                                }).format(selectedProduct.price)
+                              } 
+                            />
+                          </div>                        
+                        ))
+                      }
+                    </List>
+                  </div>
+                  
+                  <p>Please confirm that you would you like me to {lsType == "reorder" ? "reorder your products to the same shipping address at zip code " + order.ShippingAddress.postalCode + "?" : "refund the amount you paid for the shipped products?"}</p>
+                </div>
+              </div>
+              <div className="mt-16 space-y-6 self-start">
+                <Button label="Yes, Please Submit" onClick={goToConfirmation} />
+                <Button label="View Options" link onClick={goToOptions} />
               </div>
             </div>
-            <div className="mt-16 space-y-6 self-start">
-              <Button label="Yes, Please Submit" onClick={goToConfirmation} />
-              <Button label="View Options" link onClick={goToOptions} />
+          ))
+        }
+      </div>
+    )
+  } else {
+    return (
+      <div>
+        {
+          ThisOrderClaims.map((claim, index) => (
+            <div key={index}>
+              <StepHeading number="4" title="Request Already Exists" subtitle={"A request already exists for this order with Claim# "+claim.shippingProtectionClaimId }/>
             </div>
-          </div>
-        ))
-      }
-    </Layout>
-  )
+          ))
+        }
+
+      </div>
+    )
+  }
 }
 
 export default withRouter(Review);

@@ -70,26 +70,24 @@ export default function ReorderReason() {
   }
 
   return (
-    <Layout>
+    <div>
       <StepHeading number="3" title="What Happened?" subtitle="Green Shipping Protection protects against damage, theft, loss, and carbon emissions." />
       <div>
-        
-          <div>
-            <fieldset className="space-y-4">
-              <label className="text-sm">What happened to your package?</label>
-              <ReasonRadios value={radioReason} onChange={handleReasonChange} />
-              {noReasonMessage != '' && <div className="text-red-500 text-sm absolute mt-2">{noReasonMessage}</div>}
-            </fieldset>
+        <div>
+          <fieldset className="space-y-4">
+            <label className="text-sm">What happened to your package?</label>
+            <ReasonRadios value={radioReason} onChange={handleReasonChange} />
+            {noReasonMessage != '' && <div className="text-red-500 text-sm absolute mt-2">{noReasonMessage}</div>}
+          </fieldset>
+        </div>
+        <div className="mt-12 self-start">
+          <div className="space-y-4">
+            <Button label="Next" onClick={e => {handleReasonSubmit(e)}}>
+              <SvgIcon role="arrow-right" />
+            </Button>
           </div>
-          <div className="mt-12 self-start">
-            <div className="space-y-4">
-              <Button label="Next" onClick={e => {handleReasonSubmit(e)}}>
-                <SvgIcon role="arrow-right" />
-              </Button>
-            </div>
-          </div>
-        
+        </div>
       </div>
-    </Layout>
+    </div>
   )
 }

@@ -1,83 +1,65 @@
 import React from "react";
 import { withRouter } from 'next/router'
-import Layout from "./layout"
 import StepHeading from "./stepHeading"
 import Button from "./button"
 import SvgIcon from "./icons"
 import useSWR from 'swr';
 import { useContext, useEffect, useState } from 'react';
 import OrderContext from '../components/OrderContext';
-import variantIdsQuery from "../queries/variantIds";
+import { gql } from 'graphql-request'
+import { CorsoGraphQLClient } from '../queries/graphqlClient';
 
-const VARIANT_QUERY = `
-  query VARIANT_QUERY($idFromPlatform_like: String = "0") {
+const LOST_PRODUCTS_QUERY = gql`
+  query LOST_PRODUCTS_QUERY($idFromPlatform_like: String = "0") {
     Order: StoreOrder(where: {idFromPlatform: {_like: $idFromPlatform_like}}) {
-      Variants: StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
-        variantId
+      LostProducts: StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
+        storeOrderLineItemId
       }
     }
   }
 `;
 
-const FetchVariants = async () => {
-
-  const orderNumber = localStorage.getItem("order_number");
-
-  const GRAPHQL_ENDPOINT = 'https://corso-dev.thewarrickfamily.com/v1/graphql/';
-
-  const headers = {
-    'Content-Type': 'application/json',
-    "x-hasura-admin-secret": "ZwRp8xr6gs"
-  };
-
-  const options = {
-    headers : headers,
-    method: 'POST',
-    body: JSON.stringify(
-      {
-        query: VARIANT_QUERY,
-        variables: {
-          "idFromPlatform_like": orderNumber
-        }
-      }
-    )
-  };
-  const res = await fetch(GRAPHQL_ENDPOINT, options)
-  const res_json = await res.json();
-  if(res_json.errors) {
-  	throw(JSON.stringify(res_json.errors));
-  }
-  return res_json.data;
-}
-
 const ReorderDetailsLost = () => {
 
-  const { orderInfo } = useContext(OrderContext);
-  const { data: variantData, error: variantError } = useSWR(VARIANT_QUERY, FetchVariants);
-  const { data: orderData, error: orderError } = useSWR(orderInfo, orderInfo);
+  const LostProductsFetcher = async () => {
+
+    // Get data from local storage
+    const orderNumber = localStorage.getItem("order_number");
+
+    const LOST_PRODUCTS_VARIABLES = {
+      "idFromPlatform_like": orderNumber
+    }
+
+    return CorsoGraphQLClient.request(LOST_PRODUCTS_QUERY, LOST_PRODUCTS_VARIABLES)
+
+  }
+
+  const { fetchedOrderData, startOver, orderQuery } = useContext(OrderContext);
+  const { data: orderDataSwr, error: orderErrorSwr } = useSWR(orderQuery, fetchedOrderData)
+  const { data: lostProductsDataSwr, error: lostProductsErrorSwr } = useSWR(LOST_PRODUCTS_QUERY, LostProductsFetcher);
   
-  if (variantError || orderError) return <div>Failed to load</div>
-  if (!variantData || !orderData ) return <div>Loading...</div>
+  if (lostProductsErrorSwr || orderErrorSwr) return <div>Failed to load</div>
+  if (!lostProductsDataSwr || !orderDataSwr ) return <div>Loading...</div>
 
-  const { StoreOrder } = orderData;
-  const { Order } = variantData;
+  const { StoreOrder } = orderDataSwr;
+  const { LostProducts } = lostProductsDataSwr;
 
-  const variantLineItems = Order[0].Variants;
+  const lostProductsLineItems = lostProductsDataSwr.Order[0].LostProducts;
 
 	const daysSinceOrder = Math.ceil(((new Date().getTime()) - (new Date(StoreOrder[0].createdOn).getTime()))/1000/60/60/24);
 
-  if (variantData) {
+  if (lostProductsDataSwr) {
 
-    const buildObject = variantLineItems => {
+    const buildObject = lostProductsLineItems => {
       const obj = {};
-      for(let i = 0; i < variantLineItems.length; i++){
-         const { variantId, score } = variantLineItems[i];
-         obj[variantId] = score;
+      for(let i = 0; i < lostProductsLineItems.length; i++){
+         const { storeOrderLineItemId, score } = lostProductsLineItems[i];
+         obj[storeOrderLineItemId] = score;
       };
       return Object.keys(obj);
    };
 
-   localStorage.setItem("reorder_ids", JSON.stringify(buildObject(variantLineItems)));
+   localStorage.setItem("reorder_ids", JSON.stringify(buildObject(lostProductsLineItems)));
 
     return (
       <>

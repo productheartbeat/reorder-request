@@ -1,81 +1,89 @@
 import React, { useContext } from "react";
 import { withRouter } from 'next/router'
 import StepHeading from "./stepHeading"
-import Layout from "./layout"
 import Button from "./button"
 import SvgIcon from "./icons"
 import useSWR from 'swr';
 import OrderContext from '../components/OrderContext';
+import { gql } from 'graphql-request'
+import { CorsoGraphQLClient } from '../queries/graphqlClient';
 
-const VARIANT_QUERY = `
-query VARIANT_QUERY($idFromPlatform_like: String = "0") {
-  Order: StoreOrder(where: {idFromPlatform: {_like: $idFromPlatform_like}}) {
-    Variants: StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
-      variantId
+const STOLEN_PRODUCTS_QUERY = gql`
+  query STOLEN_PRODUCTS_QUERY($idFromPlatform_like: String = "0") {
+    Order: StoreOrder(where: {idFromPlatform: {_like: $idFromPlatform_like}}) {
+      StolenProducts: StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
+        storeOrderLineItemId
+      }
     }
   }
-}
 `;
 
-const FetchVariants = async () => {
-
-  const orderNumber = localStorage.getItem("order_number");
-
-  const GRAPHQL_ENDPOINT = 'https://corso-dev.thewarrickfamily.com/v1/graphql/';
-
-  const headers = {
-    'Content-Type': 'application/json',
-    "x-hasura-admin-secret": "ZwRp8xr6gs"
-  };
-
-  const options = {
-    headers : headers,
-    method: 'POST',
-    body: JSON.stringify(
-      {
-        query: VARIANT_QUERY,
-        variables: {
-          "idFromPlatform_like": orderNumber
-        }
+const CUSTOMER_CLAIMS_QUERY = gql`
+  query CUSTOMER_CLAIMS_QUERY($customerId_eq: Int = 0) {
+    CustomerClaims: ShippingProtectionClaim_aggregate(where: {OriginalStoreOrder: {Customer: {customerId: {_eq: $customerId_eq}}}}) {
+      aggregate {
+        count
       }
-    )
-  };
-  const res = await fetch(GRAPHQL_ENDPOINT, options)
-  const res_json = await res.json();
-  if(res_json.errors) {
-    throw(JSON.stringify(res_json.errors));
+    }
   }
-  return res_json.data;
-}
+`;
 
 const ReorderDetailsStolen = (props) => {
 
-	const { orderInfo } = useContext(OrderContext);
-  const { data: variantData, error: variantError } = useSWR(VARIANT_QUERY, FetchVariants);
-  const { data: orderData, error: orderError } = useSWR(orderInfo, orderInfo);
+  const StolenProductsFetcher = async () => {
+
+    // Get data from local storage
+    const orderNumber = localStorage.getItem("order_number");
+
+    const STOLEN_PRODUCTS_VARIABLES = {
+      "idFromPlatform_like": orderNumber
+    }
+
+    return await CorsoGraphQLClient.request(STOLEN_PRODUCTS_QUERY, STOLEN_PRODUCTS_VARIABLES)
+
+  }
+
+  const CustomerClaimsFetcher = async () => {
+
+    // Get data from local storage
+    const customerId = localStorage.getItem("customer_id");
+
+    const CUSTOMER_CLAIMS_VARIABLES = {
+      "customerId_eq": customerId
+    }
+
+    return await CorsoGraphQLClient.request(CUSTOMER_CLAIMS_QUERY, CUSTOMER_CLAIMS_VARIABLES)
+
+  }
+
+	const { fetchedOrderData, startOver, orderQuery } = useContext(OrderContext);
+  const { data: orderDataSwr, error: orderErrorSwr } = useSWR(orderQuery, fetchedOrderData)
+
+  const { data: stolenProductsDataSwr, error: stolenProductsErrorSwr } = useSWR(STOLEN_PRODUCTS_QUERY, StolenProductsFetcher);
+  const { data: totalCustomerClaimsDataSwr, error: totalCustomerClaimsErrorSwr } = useSWR(CUSTOMER_CLAIMS_QUERY, CustomerClaimsFetcher);
   
-  if (variantError || orderError) return <div>Failed to load</div>
-  if (!variantData || !orderData ) return <div>Loading...</div>
+  
+  if (stolenProductsErrorSwr || orderErrorSwr || totalCustomerClaimsErrorSwr) return <div>Failed to load</div>
+  if (!stolenProductsDataSwr || !orderDataSwr || !totalCustomerClaimsDataSwr) return <div>Loading...</div>
 
-  const { StoreOrder } = orderData;
-  const { Order } = variantData;
+  const { CustomerClaims } = totalCustomerClaimsDataSwr;
 
-  const variantLineItems = Order[0].Variants;
+  const stolenProductsLineItems = stolenProductsDataSwr.Order[0].StolenProducts;
 
-  const times = 1; //TO DO - make this an actual value
+  const times = CustomerClaims.aggregate.count;
 
-  if (variantData) {
+  if (stolenProductsDataSwr) {
 
-    const buildObject = variantLineItems => {
+    const buildObject = stolenProductsLineItems => {
       const obj = {};
-      for(let i = 0; i < variantLineItems.length; i++){
-         const { variantId, score } = variantLineItems[i];
-         obj[variantId] = score;
+      for(let i = 0; i < stolenProductsLineItems.length; i++){
+         const { storeOrderLineItemId, score } = stolenProductsLineItems[i];
+         obj[storeOrderLineItemId] = score;
       };
       return Object.keys(obj);
     };
 
-    localStorage.setItem("reorder_ids", JSON.stringify(buildObject(variantLineItems)));
+    localStorage.setItem("reorder_ids", JSON.stringify(buildObject(stolenProductsLineItems)));
 
     return (
       <>
@@ -95,7 +103,7 @@ const ReorderDetailsStolen = (props) => {
             <div>
               <p className="mb-8">Porch pirates are the worst. We want to make things right and we don't want to make you jump through more hoops, but we need a copy of a police report to file another reorder request.</p>
               <p className="mb-8">If you don't have that yet, you can check back and upload it here.</p>
-              <div>
+              <div className="relative">
                 <Button type="button" label="Police Report" outline path="">
                   <SvgIcon role="file" />
                 </Button>

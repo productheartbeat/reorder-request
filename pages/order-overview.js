@@ -1,5 +1,4 @@
 import useSWR from 'swr';
-import Layout from "../components/layout"
 import StepHeading from "../components/stepHeading"
 import Dl from "../components/dl"
 import DlItem from "../components/dlItem"
@@ -11,11 +10,13 @@ import OrderContext from '../components/OrderContext';
 
 export default function OrderOverview() {
 
-  const { orderInfo } = useContext(OrderContext);
-  const { data, error } = useSWR(orderInfo, orderInfo)
-  if (error) return <div>Failed to load</div>
-  if (!data) return <div>Loading...</div>
-  const { StoreOrder } = data
+  const { fetchedOrderData, startOver, orderQuery } = useContext(OrderContext);
+  const { data: orderDataSwr, error: orderErrorSwr } = useSWR(orderQuery, fetchedOrderData)
+
+  if (orderErrorSwr) return <div>Failed to load</div>
+  if (!orderDataSwr) return <div>Loading...</div>
+
+  const { StoreOrder } = orderDataSwr
 
   const goToProductOverview=()=>{
 		Router.push({
@@ -24,7 +25,7 @@ export default function OrderOverview() {
 	}
 
   return (
-    <Layout>
+    <div>
       <StepHeading number="1" title="Order Overview" subtitle="Does this look like the right order to you?" />
       <div>
         {
@@ -77,6 +78,6 @@ export default function OrderOverview() {
           </Button>
         </div>
       </div>
-    </Layout>
+    </div>
   )
 }

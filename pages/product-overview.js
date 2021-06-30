@@ -11,11 +11,13 @@ import OrderContext from '../components/OrderContext';
 
 export default function ProductOverview() {
 
-  const { orderInfo, orderNumber } = useContext(OrderContext);
-  const { data, error } = useSWR(orderInfo, orderInfo)
-  if (error) return <div>Failed to load</div>
-  if (!data) return <div>Loading...</div>
-  const { StoreOrder } = data  
+  const { fetchedOrderData, startOver, orderQuery } = useContext(OrderContext);
+  const { data: orderDataSwr, error: orderErrorSwr } = useSWR(orderQuery, fetchedOrderData)
+
+  if (orderErrorSwr) return <div>Failed to load</div>
+  if (!orderDataSwr) return <div>Loading...</div>
+
+  const { StoreOrder } = orderDataSwr
 
   const goToReorderReason=()=>{
     localStorage.setItem('store_order_id', StoreOrder[0].storeOrderId);
@@ -25,7 +27,7 @@ export default function ProductOverview() {
   }
 
   return (
-    <Layout>
+    <div>
       {
         StoreOrder.map((order, index) => (
           <div key={"order_"+index}>
@@ -57,6 +59,6 @@ export default function ProductOverview() {
           </div>
         ))
       }
-    </Layout>
+    </div>
   )
 }

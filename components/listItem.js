@@ -12,7 +12,7 @@ export default function ListItem(props) {
                 }
             </div>
             <div className="flex flex-col ml-1">
-                <span>{props.title}</span>
+                <span className="font-bold">{props.title}</span>
                 <small>{props.subtitle}</small>
                 <small>{props.desc}</small>
             </div>

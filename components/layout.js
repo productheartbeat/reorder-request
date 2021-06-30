@@ -11,6 +11,13 @@ const Layout = (props) => {
 	const { startOver, orderNumber } = useContext(OrderContext);
 
 	const page = props.router.query.page;
+  const claimId = props.router.query.claimId;
+
+  if (claimId === null) {
+    var showBack = false
+  } else {
+    var showBack = true
+  }
 
 	const goToHelp=()=>{
 		Router.push({
@@ -35,7 +42,7 @@ const Layout = (props) => {
 					<div className="card-wrapper md:py-0 relative sm:max-w-2xl sm:mx-auto w-full">
 						<div className="card relative bg-white shadow-lg rounded-xl sm:rounded-3xl w-full border-b-8 border-green-600">
 							<div className="card-body px-4 py-10 sm:p-20">
-								{orderNumber && page != "/"
+								{showBack
 								?
 									<span onClick={backLogic} className="absolute top-3 left-3 cursor-pointer font-bold text-green-700">
 										<div className="flex items-center">
@@ -46,7 +53,7 @@ const Layout = (props) => {
 								: 
 									"" 
 								}
-								{page != "/help"
+								{page != "help" 
 								?
 									<span className="absolute top-3 right-3 cursor-pointer" onClick={goToHelp}>
 										<SvgIcon role="question" />

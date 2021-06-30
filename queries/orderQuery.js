@@ -21,6 +21,7 @@ const orderQuery = `
         price
         variantId
         quantity
+        storeOrderLineItemId
       }
       ShippingProtectionClaims_aggregate {
         aggregate {
@@ -28,7 +29,7 @@ const orderQuery = `
         }
       }
     }
-    storeOrderLineItem_aggregate(where: {storeOrder: {idFromPlatform: {_like: $idFromPlatform_like}}}) {
+    StoreOrderLineItem_aggregate(where: {storeOrder: {idFromPlatform: {_like: $idFromPlatform_like}}}) {
       aggregate {
         count
       }

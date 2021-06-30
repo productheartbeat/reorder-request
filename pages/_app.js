@@ -2,116 +2,146 @@ import React from 'react';
 import App from 'next/app';
 import Router from 'next/router';
 import OrderContext from '../components/OrderContext';
+import Layout from '../components/layout';
+import { gql } from 'graphql-request'
+import { CorsoGraphQLClient } from '../queries/graphqlClient';
 import '../styles/global.css';
-import orderQuery from '../queries/orderQuery';
+
+const ORDER_QUERY = gql`
+  query ORDER_QUERY($idFromPlatform_eq: String = "0") {
+    StoreOrder(where: {idFromPlatform: {_eq: $idFromPlatform_eq}}) {
+      idFromPlatform
+      storeOrderId
+      createdOn
+      orderTotal
+      customerEmail
+      canceledOn
+      cancelReason
+      Customer {
+        firstName
+        customerId
+      }
+      Store {
+        name
+      }
+      ShippingAddress {
+        postalCode
+      }
+      StoreOrderLineItems(where: {vendor: {_nilike: "Corso, LLC"}}) {
+        name
+        sku
+        price
+        variantId
+        quantity
+        storeOrderLineItemId
+      }
+      ShippingProtectionClaims_aggregate {
+        aggregate {
+          count
+        }
+      }
+    }
+    StoreOrderLineItem_aggregate(where: {storeOrder: {idFromPlatform: {_like: $idFromPlatform_eq}}}) {
+      aggregate {
+        count
+      }
+    }
+  }
+`
 
 export default class MyApp extends App {
   state = {
     orderNumber: null,
-    order: null
+    fetchedOrderData: null,
+    orderQuery: null,
+    orderInfoFetcher: null
   };
 
   componentDidMount = () => {
-    const orderNumber = localStorage.getItem('order_number');
-    if (orderNumber) {
+    const lsOrderNumber = localStorage.getItem('order_number');
+    
+    if (lsOrderNumber) {
 
-      this.setState({
-        orderNumber
-      });
+      /*const orderInfoFetcher = async () => {
 
-      let url = "https://corso-dev.thewarrickfamily.com/v1/graphql/";
+        const ORDER_VARIABLES = {
+          "idFromPlatform_like": orderIdFromUser
+        }
 
-      const orderInfo = (query) =>
-      
-        fetch(
-          url,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-hasura-admin-secret": "ZwRp8xr6gs",
-            },
-            body: JSON.stringify({
-              query: orderQuery,
-              variables: {
-                "idFromPlatform_like": orderNumber
-              },
-            }),
-          }
-        )
-        .then((res) => res.json())
-        .then((json) => json.data)
+        return CorsoGraphQLClient.request(ORDER_QUERY, ORDER_VARIABLES)
 
-      this.setState({
-        data: orderInfo
-      });
+      }
+      this.setState(
+        {
+          orderNumber: lsOrderNumber,
+          orderData: orderInfoFetcher,
+          //orderHasRequests: orderHasRequests
+        }
+      );*/ 
 
+      localStorage.clear();
+      Router.push('/');
 
     } else {
+      localStorage.clear();
       Router.push('/');
     }
   };
 
-  orderIdLookup = (idFromPlatform) => {
+  orderIdLookup = (orderIdFromUser) => {
 
-    let url = "https://corso-dev.thewarrickfamily.com/v1/graphql/";
+    const orderDataFetcher = async () => {
 
-    const orderInfo = (query) =>
-      fetch(
-        url,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-hasura-admin-secret": "ZwRp8xr6gs",
-          },
-          body: JSON.stringify({
-            query: orderQuery,
-            variables: {
-              "idFromPlatform_like": idFromPlatform
-            },
-          }),
-        }
-      )
-      .then((res) => res.json())
-      .then((json) => json.data)
+      const ORDER_VARIABLES = {
+        "idFromPlatform_eq": orderIdFromUser
+      }
 
-    localStorage.setItem('order_number', idFromPlatform);
+      return CorsoGraphQLClient.request(ORDER_QUERY, ORDER_VARIABLES)
+
+    }
+
+    localStorage.setItem('order_number', orderIdFromUser);
 
     this.setState(
       {
-        orderNumber: idFromPlatform,
-        data: orderInfo
+        orderNumber: orderIdFromUser,
+        fetchedOrderData: orderDataFetcher,
+        orderQuery: ORDER_QUERY,
       },
       () => {
         Router.push('/store-message');
       }
     );
+
   };
 
   startOver = () => {
     localStorage.clear();
     this.setState({
       orderNumber: null,
-      order: null
+      order: null,
+      orderQuery: null,
     });
     Router.push('/');
   };
 
   render() {
+
     const { Component, pageProps } = this.props;
     
     return (
       <OrderContext.Provider 
         value={{ 
           orderNumber: this.state.orderNumber, 
-          orderInfo: this.state.data, 
+          fetchedOrderData: this.state.fetchedOrderData,
+          orderQuery: this.state.orderQuery,
           orderIdLookup: this.orderIdLookup, 
           startOver: this.startOver,
         }}
       >
-        
-        <Component {...pageProps} />
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
         
       </OrderContext.Provider>
     );
